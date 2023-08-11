@@ -13,6 +13,7 @@
             margin: 0;
             padding: 0;
             font-family: Arial, Helvetica, sans-serif;
+            /* //add work sans font */
         }
 
         #filters {
@@ -73,6 +74,40 @@
             margin: 10px 0px;
         }
 
+        .filter {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .filter-item {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .search {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin: 20px 0px;
+            box-sizing: border-box;
+        }
+
+        /* light backdrops only */
+        input[type="search"]::-webkit-search-cancel-button {
+            -webkit-appearance: none;
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-left: 10px;
+            background:
+                linear-gradient(45deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 43%, #000 45%, #000 55%, rgba(0, 0, 0, 0) 57%, rgba(0, 0, 0, 0) 100%),
+                linear-gradient(135deg, transparent 0%, transparent 43%, #000 45%, #000 55%, transparent 57%, transparent 100%);
+            cursor: pointer;
+        }
+
+
+
         @media (min-width: 0px) and (max-width: 767px) {
             .main-container {
                 flex-direction: column;
@@ -116,8 +151,10 @@
             d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQmR-rLwhGlTPozaI_9f5C9wd4HxQaXv4I54Ib7oppMWpD2BY5zjJ23gwV85zcfV4fRbK9TnTFz0QOi/pub?output=csv")
                 .then(data => {
                     console.log('data', data);
-                    const points = data.map(pin => {
 
+                    itemsDiv.appendChild(createCoutryFilters())
+
+                    const points = data.map(pin => {
                         itemsDiv.appendChild(geenrateItem(pin, () => {
                             map.flyTo({
                                 center: [+pin.lng, +pin.lat],
@@ -133,7 +170,8 @@
                             },
                             properties: {
                                 ...pin,
-                                color: '#B42222'
+                                color: '#B42222',
+                                country: pin.country.toLowerCase().trim()
                             }
                         }
                     })
@@ -161,6 +199,49 @@
                 }
             });
         });
+
+        function createCoutryFilters() {
+            const countries = ['United States', 'Canada'];
+            let selectedCountry = null;
+
+            const mainDiv = document.createElement('div');
+
+            const div = document.createElement('div');
+            div.className = 'filter';
+
+            const names = countries.map(c => printCoutry(c))
+            console.log('names', names);
+            div.append(...names)
+
+
+            const search = document.createElement('input');
+            search.className = 'search';
+            search.type = 'search';
+            search.placeholder = 'Search';
+            search.addEventListener('keyup', (e) => {
+                const value = e.target.value.toLowerCase().trim();
+            })
+
+            function printCoutry(country) {
+                const div = document.createElement('div');
+                div.className = 'filter-item';
+                div.innerHTML = country;
+                div.style.color = '#ccc';
+
+                div.addEventListener('click', () => {
+                    names.forEach(n => n.style.color = '#ccc')
+                    div.style.color = 'black';
+                    selectedCountry = country;
+                    const filter = ['==', ['get', 'country'], country.toLowerCase().trim()];
+                    map.setFilter('dealers', filter);
+                })
+                return div
+            }
+
+            mainDiv.appendChild(div)
+            mainDiv.appendChild(search)
+            return mainDiv
+        }
 
         function geenrateItem(pin, clickHandler) {
             const { name, address } = pin;
