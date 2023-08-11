@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Add a polygon to a map using a GeoJSON source</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #filters {
+            width: 400px;
+            max-height: 100vh;
+            overflow: auto;
+        }
+
+        #map {
+            flex: 1 1 auto;
+            height: 100vh;
+        }
+
+        .filters-container {
+            padding: 20px 40px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .circle {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #B42222;
+            margin-right: 10px;
+        }
+
+        .item {
+            border-top: 2px solid #d8d9d9;
+            padding: 20px 10px;
+        }
+
+        .item:hover {
+            background-color: #f7f7f7;
+            cursor: pointer;
+            /* user-select: none; */
+        }
+
+        .item-header {
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .item-address {
+            margin: 10px 0px;
+        }
+
+        @media (min-width: 0px) and (max-width: 767px) {
+            .main-container {
+                flex-direction: column;
+                flex-direction: column-reverse;
+                display: flex;
+            }
+
+            #map {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-container">
+        <div id="filters">
+            <div class="filters-container">
+                <div class="title">Find a dealer</div>
+                <div id="items-list"></div>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const itemsDiv = document.getElementById('items-list');
+        mapboxgl.accessToken = 'pk.eyJ1IjoiaXRhbWwiLCJhIjoiY2xnejhqdm44MGd2MjNkbWkwaXl3a2JjbCJ9.aPU1vAsg4V7lhyR5BYqk5g';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+            style: 'mapbox://styles/mapbox/light-v11', // style URL
+            center: { lng: -100.99314708544222, lat: 41.211945631965506 },
+            zoom: 4, // starting zoom
+            projection: "mercator"
+        });
+
+        map.on('load', () => {
+
+            d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQmR-rLwhGlTPozaI_9f5C9wd4HxQaXv4I54Ib7oppMWpD2BY5zjJ23gwV85zcfV4fRbK9TnTFz0QOi/pub?output=csv")
+                .then(data => {
+                    console.log('data', data);
+                    const points = data.map(pin => {
+
+                        itemsDiv.appendChild(geenrateItem(pin, () => {
+                            map.flyTo({
+                                center: [+pin.lng, +pin.lat],
+                                zoom: 10
+                            });
+                        }));
+
+                        return {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [+pin.lng, +pin.lat]
+                            },
+                            properties: {
+                                ...pin,
+                                color: '#B42222'
+                            }
+                        }
+                    })
+                    map.getSource('dealers').setData({
+                        type: 'FeatureCollection',
+                        features: points
+                    })
+                })
+
+            //addd source emty geojson 
+            map.addSource('dealers', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: []
+                }
+            });
+            map.addLayer({
+                id: 'dealers',
+                type: 'circle',
+                source: 'dealers',
+                paint: {
+                    'circle-radius': 6,
+                    'circle-color': '#B42222'
+                }
+            });
+        });
+
+        function geenrateItem(pin, clickHandler) {
+            const { name, address } = pin;
+            const phone = '434-4444-44444'
+
+            const div = document.createElement('div');
+            div.className = 'item';
+
+            const itemHeaderDiv = document.createElement('div');
+            itemHeaderDiv.className = 'item-header';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'name';
+            nameDiv.innerHTML = name;
+
+            const circle = document.createElement('div');
+            circle.className = 'circle';
+
+            const addressDiv = document.createElement('div');
+            addressDiv.className = 'item-address';
+            addressDiv.innerHTML = address;
+
+            const phoneDiv = document.createElement('div');
+            phoneDiv.className = 'item-phone';
+            phoneDiv.innerHTML = phone;
+
+
+            itemHeaderDiv.appendChild(circle);
+            itemHeaderDiv.appendChild(nameDiv);
+
+
+            div.appendChild(itemHeaderDiv);
+            div.appendChild(addressDiv);
+            div.appendChild(phoneDiv);
+
+            div.addEventListener('click', () => {
+                if (typeof clickHandler === "function") {
+                    clickHandler(pin)
+                }
+            })
+            return div
+        }
+
+    </script>
+
+</body>
+
+</html>
