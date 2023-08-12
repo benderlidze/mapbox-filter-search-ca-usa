@@ -47,8 +47,7 @@
         .circle {
             width: 14px;
             height: 14px;
-            border-radius: 50%;
-            background-color: #B42222;
+            border-radius: 100%;
             margin-right: 10px;
         }
 
@@ -124,21 +123,36 @@
             }
         }
 
-        /* Media queries*/
-        @media screen and (min-width: 640px) {
-            .mapboxgl-ctrl-geocoder.mapboxgl-ctrl-geocoder--collapsed {
-                width: 36px;
-                min-width: 36px;
-            }
+        .mapboxgl-ctrl-geocoder {
+            width: 100% !important;
+            font-size: 15px;
+            line-height: 20px;
+            max-width: 360px;
+            border: 1px solid #ccc;
+            box-shadow: none !important;
+        }
 
-            .mapboxgl-ctrl-geocoder {
-                width: 100% !important;
-                font-size: 15px;
-                line-height: 20px;
-                max-width: 360px;
-                border: 1px solid #ccc;
-                box-shadow: none !important;
-            }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 5px 0px #ccc;
+
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .legend-item {
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+            margin-right: 10px;
         }
     </style>
 </head>
@@ -165,6 +179,21 @@
     </div>
 
     <script>
+
+        const colors = [
+            {
+                color: '#4c8274',
+                name: 'Scout Dealer'
+            },
+            {
+                color: '#ec502d',
+                name: 'View a Scout Camper'
+            },
+            {
+                color: '#409adf',
+                name: 'GooseGear outfitter'
+            }
+        ]
         const mainData = []
         const itemsDiv = document.getElementById('items-list');
         const searchContainer = document.getElementById('search-container');
@@ -197,6 +226,8 @@
             console.log('111', 111);
             reorderList(result)
         });
+
+        createLegend()
 
         map.on('load', () => {
 
@@ -299,6 +330,22 @@
 
         });
 
+        function createLegend() {
+            //add a legent to the map 
+            const legend = document.createElement('div');
+            legend.className = 'legend';
+            const items = colors.map(c => {
+                return `
+                <div class="legend-item">
+                    <div class="circle" style="background-color: ${c.color};"></div>
+                    <div class="legend-text">${c.name}</div>
+                </div>
+                `
+            })
+            legend.innerHTML = items.join('');
+            map.getCanvas().parentNode.appendChild(legend);
+        }
+
         function reorderList(result) {
             console.log('result', result);
             const [lng, lat] = result.geometry.coordinates;
@@ -332,7 +379,11 @@
         }
 
         function createCoutryFilters() {
-            const countries = ['United States', 'Canada'];
+            const countries = [
+                { name: 'United States', code: "US" },
+                { name: 'Canada', code: "CA" }
+            ];
+
             let selectedCountry = null;
 
             const mainDiv = document.createElement('div');
@@ -347,15 +398,16 @@
             function printCoutry(country) {
                 const div = document.createElement('div');
                 div.className = 'filter-item';
-                div.innerHTML = country;
+                div.innerHTML = country.name;
                 div.style.color = '#ccc';
 
                 div.addEventListener('click', () => {
                     names.forEach(n => n.style.color = '#ccc')
                     div.style.color = 'black';
                     selectedCountry = country;
-                    const filter = ['==', ['get', 'country'], country.toLowerCase().trim()];
-                    map.setFilter('dealers', filter);
+                    // const filter = ['==', ['get', 'country'], country.toLowerCase().trim()];
+                    // map.setFilter('dealers', filter);
+                    geocoder.setCountries(country.code);
                 })
                 return div
             }
