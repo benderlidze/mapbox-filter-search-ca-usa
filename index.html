@@ -8,6 +8,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -86,8 +87,7 @@
 
         .search {
             width: 100%;
-            padding: 15px;
-            border: 1px solid #ccc;
+            /* border: 1px solid #ccc; */
             border-radius: 5px;
             margin: 20px 0px;
             box-sizing: border-box;
@@ -106,8 +106,6 @@
             cursor: pointer;
         }
 
-
-
         @media (min-width: 0px) and (max-width: 767px) {
             .main-container {
                 flex-direction: column;
@@ -125,15 +123,41 @@
                 overflow: auto;
             }
         }
+
+        /* Media queries*/
+        @media screen and (min-width: 640px) {
+            .mapboxgl-ctrl-geocoder.mapboxgl-ctrl-geocoder--collapsed {
+                width: 36px;
+                min-width: 36px;
+            }
+
+            .mapboxgl-ctrl-geocoder {
+                width: 100% !important;
+                font-size: 15px;
+                line-height: 20px;
+                max-width: 360px;
+                border: 1px solid #ccc;
+                box-shadow: none !important;
+            }
+        }
     </style>
 </head>
 
 <body>
 
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css"
+        type="text/css">
+
+
     <div class="main-container">
         <div id="filters">
             <div class="filters-container">
                 <div class="title">Find a dealer</div>
+                <div id="countries-container"></div>
+                <div id="search-container"></div>
                 <div id="items-list"></div>
             </div>
         </div>
@@ -141,7 +165,11 @@
     </div>
 
     <script>
+        const mainData = []
         const itemsDiv = document.getElementById('items-list');
+        const searchContainer = document.getElementById('search-container');
+        const countriesContainer = document.getElementById('countries-container');
+
         mapboxgl.accessToken = 'pk.eyJ1IjoiaXRhbWwiLCJhIjoiY2xnejhqdm44MGd2MjNkbWkwaXl3a2JjbCJ9.aPU1vAsg4V7lhyR5BYqk5g';
         const map = new mapboxgl.Map({
             container: 'map', // container ID
@@ -151,23 +179,39 @@
             zoom: 4, // starting zoom
             projection: "mercator"
         });
+        // Add the control to the map.
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            mapboxgl: mapboxgl,
+
+        });
+
+        // Handle geocoder result selection
+        geocoder.on('result', (event) => {
+            const result = event.result;
+            map.flyTo({
+                center: result.geometry.coordinates,
+                zoom: 12,
+            });
+
+            console.log('111', 111);
+            reorderList(result)
+        });
 
         map.on('load', () => {
 
             d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQmR-rLwhGlTPozaI_9f5C9wd4HxQaXv4I54Ib7oppMWpD2BY5zjJ23gwV85zcfV4fRbK9TnTFz0QOi/pub?output=csv")
                 .then(data => {
                     console.log('data', data);
-
-                    itemsDiv.appendChild(createCoutryFilters())
-
+                    createCoutryFilters()
+                    createSearch()
                     const points = data.map(pin => {
-                        itemsDiv.appendChild(geenrateItem(pin, () => {
+                        itemsDiv.appendChild(generateItem(pin, () => {
                             map.flyTo({
                                 center: [+pin.lng, +pin.lat],
                                 zoom: 10
                             });
                         }));
-
                         return {
                             type: 'Feature',
                             geometry: {
@@ -181,12 +225,12 @@
                             }
                         }
                     })
+                    mainData.push(...data);
                     map.getSource('dealers').setData({
                         type: 'FeatureCollection',
                         features: points
                     })
                 })
-
             //addd source emty geojson 
             map.addSource('dealers', {
                 type: 'geojson',
@@ -195,16 +239,97 @@
                     features: []
                 }
             });
+
+            map.addLayer({
+                id: 'circle-selected',
+                type: 'circle',
+                source: 'dealers',
+                paint: {
+                    'circle-radius': 15,
+                    'circle-color': 'white',
+                    'circle-stroke-color': ['get', 'color'],
+                    'circle-stroke-width': 2
+                },
+                filter: ['==', ['get', 'address'], '']
+            });
+
             map.addLayer({
                 id: 'dealers',
                 type: 'circle',
                 source: 'dealers',
                 paint: {
                     'circle-radius': 6,
-                    'circle-color': '#B42222'
+                    'circle-color': ['get', 'color'],
                 }
             });
+
+            map.on('click', (e) => {
+                map.setFilter('circle-selected', ['==', ['get', 'address'], '']);
+            });
+
+            map.on('click', 'dealers', (e) => {
+                // Copy coordinates array.
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const props = e.features[0].properties;
+                // Ensure that if the map is zoomed out such that multiple
+                // copies of the feature are visible, the popup appears
+                // over the copy being pointed to.
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
+
+                const description = generateItem(props, null, false, '')
+                new mapboxgl.Popup({ offset: [0, -20] })
+                    .setLngLat(coordinates)
+                    .setDOMContent(description)
+                    .addTo(map);
+
+                map.setFilter('circle-selected', ['==', ['get', 'address'], props.address]);
+            });
+
+            // Change the cursor to a pointer when the mouse is over the places layer.
+            map.on('mouseenter', 'dealers', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            // Change it back to a pointer when it leaves.
+            map.on('mouseleave', 'dealers', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
         });
+
+        function reorderList(result) {
+            console.log('result', result);
+            const [lng, lat] = result.geometry.coordinates;
+            //sort maindata points by distance 
+            const sortedPoints = mainData.sort((a, b) => {
+                const { lng: lng1, lat: lat1 } = a;
+                const { lng: lng2, lat: lat2 } = b;
+                const from = turf.point([lng, lat]);
+                const to1 = turf.point([lng1, lat1]);
+                const to2 = turf.point([lng2, lat2]);
+                const distance1 = turf.distance(from, to1);
+                const distance2 = turf.distance(from, to2);
+                return distance1 - distance2
+            }).map(pin => {
+                return generateItem(pin, () => {
+                    map.flyTo({
+                        center: [+pin.lng, +pin.lat],
+                        zoom: 10
+                    });
+                })
+            })
+            itemsDiv.replaceChildren(...sortedPoints)
+        }
+
+        function createSearch() {
+            const search = document.createElement('div');
+            search.className = 'search';
+            search.id = 'search';
+            searchContainer.appendChild(search)
+            search.appendChild(geocoder.onAdd(map));
+        }
 
         function createCoutryFilters() {
             const countries = ['United States', 'Canada'];
@@ -218,15 +343,6 @@
             const names = countries.map(c => printCoutry(c))
             console.log('names', names);
             div.append(...names)
-
-
-            const search = document.createElement('input');
-            search.className = 'search';
-            search.type = 'search';
-            search.placeholder = 'Search';
-            search.addEventListener('keyup', (e) => {
-                const value = e.target.value.toLowerCase().trim();
-            })
 
             function printCoutry(country) {
                 const div = document.createElement('div');
@@ -245,16 +361,15 @@
             }
 
             mainDiv.appendChild(div)
-            mainDiv.appendChild(search)
-            return mainDiv
+            countriesContainer.appendChild(mainDiv)
         }
 
-        function geenrateItem(pin, clickHandler) {
+        function generateItem(pin, clickHandler, showCircle = true, itemClassName = 'item') {
             const { name, address } = pin;
             const phone = '434-4444-44444'
 
             const div = document.createElement('div');
-            div.className = 'item';
+            div.className = itemClassName
 
             const itemHeaderDiv = document.createElement('div');
             itemHeaderDiv.className = 'item-header';
@@ -274,10 +389,8 @@
             phoneDiv.className = 'item-phone';
             phoneDiv.innerHTML = phone;
 
-
-            itemHeaderDiv.appendChild(circle);
+            showCircle && itemHeaderDiv.appendChild(circle);
             itemHeaderDiv.appendChild(nameDiv);
-
 
             div.appendChild(itemHeaderDiv);
             div.appendChild(addressDiv);
