@@ -451,6 +451,8 @@
                     // const filter = ['==', ['get', 'country'], country.toLowerCase().trim()];
                     // map.setFilter('dealers', filter);
                     geocoder.setCountries(country.code);
+
+                    geocoder.query(country.name)
                 })
                 return div
             }
