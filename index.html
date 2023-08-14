@@ -155,6 +155,18 @@
             align-items: center;
             margin-right: 10px;
         }
+
+        .item-phone {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .item-phone>img {
+            margin-right: 5px;
+        }
     </style>
 </head>
 
@@ -237,13 +249,43 @@
                     console.log('data', data);
                     createCoutryFilters()
                     createSearch()
+
+                    //set color and logo badge
+                    data.forEach(d => {
+                        const tags = d.tags.split(',').map(t => t.toLowerCase().trim());
+
+                        // Scout HQ = Logo badge
+                        // Goose Gear = Blue Pin
+                        // Scout Dealer = Green Pin
+                        // View a camper = Red Pin
+
+                        let color = '';
+                        console.log('tags', tags);
+                        if (tags.includes('scout hq')) {
+                            d.logoBadge = `See a scout camper here`
+                        } else {
+                            d.logoBadge = ``
+                        }
+
+                        if (tags.includes('goose gear outfitter')) {
+                            color = `#409adf`;
+                        } else if (tags.includes('scout dealer')) {
+                            color = `#4c8274`;
+                        } else if (tags.includes('view a camper')) {
+                            color = `#ec502d`;
+                        }
+                        d.color = color;
+                    })
+
                     const points = data.map(pin => {
+
                         itemsDiv.appendChild(generateItem(pin, () => {
                             map.flyTo({
                                 center: [+pin.lng, +pin.lat],
                                 zoom: 10
                             });
                         }));
+
                         return {
                             type: 'Feature',
                             geometry: {
@@ -252,11 +294,11 @@
                             },
                             properties: {
                                 ...pin,
-                                color: '#ec502d',
                                 country: pin.country.toLowerCase().trim()
                             }
                         }
                     })
+
                     mainData.push(...data);
                     map.getSource('dealers').setData({
                         type: 'FeatureCollection',
@@ -418,7 +460,7 @@
         }
 
         function generateItem(pin, clickHandler, showCircle = true, itemClassName = 'item') {
-            const { name, address } = pin;
+            const { name, address, color, logoBadge } = pin;
             const phone = '434-4444-44444'
 
             const div = document.createElement('div');
@@ -433,14 +475,26 @@
 
             const circle = document.createElement('div');
             circle.className = 'circle';
+            circle.style.backgroundColor = color;
 
             const addressDiv = document.createElement('div');
             addressDiv.className = 'item-address';
             addressDiv.innerHTML = address;
 
+            const logoBadgeDiv = document.createElement('div');
+            logoBadgeDiv.className = 'item-phone';
+            logoBadgeDiv.innerHTML = logoBadge;
+            const logoBadgeIcon = document.createElement('img');
+            logoBadgeIcon.src = 'icons/info.png';
+            logoBadgeDiv.appendChild(logoBadgeIcon);
+
+
             const phoneDiv = document.createElement('div');
             phoneDiv.className = 'item-phone';
             phoneDiv.innerHTML = phone;
+            const phoneIcon = document.createElement('img');
+            phoneIcon.src = 'icons/phone.png';
+            phoneDiv.appendChild(phoneIcon);
 
             showCircle && itemHeaderDiv.appendChild(circle);
             itemHeaderDiv.appendChild(nameDiv);
@@ -448,6 +502,7 @@
             div.appendChild(itemHeaderDiv);
             div.appendChild(addressDiv);
             div.appendChild(phoneDiv);
+            logoBadge !== "" && div.appendChild(logoBadgeDiv);
 
             div.addEventListener('click', () => {
                 if (typeof clickHandler === "function") {
