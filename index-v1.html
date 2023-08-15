@@ -192,7 +192,7 @@
     </div>
 
     <script>
-
+        let selectedCountry = null;
         const colors = [
             {
                 color: '#4c8274',
@@ -278,13 +278,32 @@
                     })
 
                     const points = data.map(pin => {
-                        itemsDiv.appendChild(generateItem(pin, () => {
-                            map.flyTo({
-                                center: [+pin.lng, +pin.lat],
-                                zoom: 10
-                            });
-                            openPopupAt([+pin.lng, +pin.lat], pin)
-                        }));
+                        // Scout Campers factory  marker should not be displayed in the legend alongside other markers.
+                        if (!pin.tags.split(",").map(d => d.toLowerCase()).includes('scout hq')) {
+                            itemsDiv.appendChild(generateItem(pin, () => {
+                                map.flyTo({
+                                    center: [+pin.lng, +pin.lat],
+                                    zoom: 10
+                                });
+                                openPopupAt([+pin.lng, +pin.lat], pin)
+                            }));
+                        } else {
+
+                            //new mapbox GL JS  div pin 
+                            const el = document.createElement('div');
+                            el.className = 'marker';
+                            el.style.backgroundImage = `url('icons/scout-campers-factory-marker.png')`;
+                            el.style.width = '49px';
+                            el.style.height = '24px';
+                            el.style.backgroundSize = 'cover';
+                            el.style.backgroundRepeat = 'no-repeat';
+                            el.style.backgroundPosition = 'center';
+                            //add marker to map
+                            new mapboxgl.Marker(el, { offset: [0, -20] })
+                                .setLngLat([+pin.lng, +pin.lat])
+                                .addTo(map);
+                        }
+
                         return {
                             type: 'Feature',
                             geometry: {
@@ -297,8 +316,7 @@
                             }
                         }
                     })
-
-                    mainData.push(...data);
+                    mainData.push(...data.filter(d => !d.tags.split(",").map(d => d.toLowerCase()).includes('scout hq')));
                     map.getSource('dealers').setData({
                         type: 'FeatureCollection',
                         features: points
@@ -405,14 +423,21 @@
                 const distance1 = turf.distance(from, to1);
                 const distance2 = turf.distance(from, to2);
                 return distance1 - distance2
-            }).map(pin => {
-                return generateItem(pin, () => {
-                    map.flyTo({
-                        center: [+pin.lng, +pin.lat],
-                        zoom: 10
-                    });
-                })
             })
+                .filter(d => {
+                    if (selectedCountry.name.toLowerCase() === 'all') {
+                        return true
+                    }
+                    return d.country.split(',').map(t => t.toLowerCase().trim()).includes(selectedCountry.name.toLowerCase())
+                })
+                .map(pin => {
+                    return generateItem(pin, () => {
+                        map.flyTo({
+                            center: [+pin.lng, +pin.lat],
+                            zoom: 10
+                        });
+                    })
+                })
             itemsDiv.replaceChildren(...sortedPoints)
         }
 
@@ -431,37 +456,78 @@
                 { name: 'Canada', code: "CA" }
             ];
 
-            let selectedCountry = null;
-
             const mainDiv = document.createElement('div');
-
             const div = document.createElement('div');
             div.className = 'filter';
 
             const names = countries.map(c => printCoutry(c))
-            console.log('names', names);
             div.append(...names)
 
             function printCoutry(country) {
                 const div = document.createElement('div');
                 div.className = 'filter-item';
                 div.innerHTML = country.name;
-                div.style.color = '#ccc';
+                div.style.color = country.name.toLowerCase() === 'all' ? 'black' : '#ccc';
 
                 div.addEventListener('click', () => {
                     names.forEach(n => n.style.color = '#ccc')
                     div.style.color = 'black';
                     selectedCountry = country;
-                    // const filter = ['==', ['get', 'country'], country.toLowerCase().trim()];
-                    // map.setFilter('dealers', filter);
-                    geocoder.setCountries(country.code);
-                    geocoder.query(country.name)
+
+                    // geocoder.setCountries(country.code);
+                    // geocoder.query(country.name)
+
+                    if (country.code === 'all') {
+                        map.setFilter('dealers', null);
+                        fitBounds(country.name.toLowerCase())
+                        return;
+                    }
+
+                    map.setFilter('circle-selected', ['==', ['get', 'address'], '']);
+                    const filter = ['==', ['get', 'country'], country.name.toLowerCase().trim()];
+                    map.setFilter('dealers', filter);
+                    fitBounds(country.name.toLowerCase())
+
+                    const newItems = mainData
+                        .filter(d => {
+                            if (country.name.toLowerCase() === 'all') {
+                                return true
+                            }
+                            return d.country.split(',').map(t => t.toLowerCase().trim()).includes(country.name.toLowerCase())
+                        })
+                        .map(pin => {
+                            return generateItem(pin, () => {
+                                map.flyTo({
+                                    center: [+pin.lng, +pin.lat],
+                                    zoom: 10
+                                });
+                                openPopupAt([+pin.lng, +pin.lat], pin)
+                            })
+                        })
+                    itemsDiv.replaceChildren(...newItems)
                 })
                 return div
             }
 
             mainDiv.appendChild(div)
             countriesContainer.appendChild(mainDiv)
+        }
+
+        function fitBounds(countryFilter) {
+            const bounds = new mapboxgl.LngLatBounds();
+            mainData
+                .filter(d => {
+                    if (countryFilter === 'all') {
+                        return true
+                    }
+                    return d.country.split(',').map(t => t.toLowerCase().trim()).includes(countryFilter)
+                })
+                .forEach(d => {
+                    bounds.extend([+d.lng, +d.lat])
+                })
+            map.fitBounds(bounds, {
+                padding: 100
+            });
         }
 
         function generateItem(pin, clickHandler, showCircle = true, itemClassName = 'item') {
