@@ -285,18 +285,17 @@
                     })
                     console.log('data', data);
                     const points = data.map(pin => {
-                        // Scout Campers factory  marker should not be displayed in the legend alongside other markers.
-                        if (!pin.tags.split(",").map(d => d.toLowerCase()).includes('scout hq')) {
-                            itemsDiv.appendChild(generateItem(pin, () => {
-                                map.flyTo({
-                                    center: [+pin.lng, +pin.lat],
-                                    zoom: 10
-                                });
-                                openPopupAt([+pin.lng, +pin.lat], pin)
-                            }));
-                        } else {
 
-                            //new mapbox GL JS  div pin for scout hq
+                        itemsDiv.appendChild(generateItem(pin, () => {
+                            map.flyTo({
+                                center: [+pin.lng, +pin.lat],
+                                zoom: 10
+                            });
+                            openPopupAt([+pin.lng, +pin.lat], pin)
+                        }));
+
+                        if (pin.tags.split(",").map(d => d.toLowerCase()).includes('scout hq')) {
+                            //new custom div pin for scout hq
                             const el = document.createElement('div');
                             el.className = 'marker';
                             el.style.backgroundImage = `url('icons/scout-campers-factory-marker.png')`;
@@ -390,16 +389,21 @@
         });
 
         function openPopupAt(coords, props) {
-
-            console.log('coords, props', coords, props);
-
             const description = generateItem(props, null, false, '')
-            new mapboxgl.Popup({ offset: [0, -20] })
+
+            //remove previous popup
+            const popup = document.getElementsByClassName('mapboxgl-popup');
+            if (popup.length) {
+                popup[0].remove();
+            }
+
+            new mapboxgl.Popup({
+                offset: [0, -20],
+            })
                 .setLngLat(coords)
                 .setDOMContent(description)
                 .addTo(map);
             map.setFilter('circle-selected', ['==', ['get', 'address'], props.address]);
-
         }
 
         function createLegend() {
