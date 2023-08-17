@@ -259,9 +259,16 @@
                         // Scout Dealer = Green Pin
                         // View a camper = Red Pin
 
-                        let color = '#ec502d';
                         console.log('tags', tags);
+
+                        let color = '#ec502d';
                         if (tags.includes('scout hq')) {
+                            d.logoBadge = `See a scout camper here`
+                        } else {
+                            d.logoBadge = ``
+                        }
+
+                        if (tags.includes('See a scout camper here'.toLowerCase())) {
                             d.logoBadge = `See a scout camper here`
                         } else {
                             d.logoBadge = ``
@@ -276,7 +283,7 @@
                         }
                         d.color = color;
                     })
-
+                    console.log('data', data);
                     const points = data.map(pin => {
                         // Scout Campers factory  marker should not be displayed in the legend alongside other markers.
                         if (!pin.tags.split(",").map(d => d.toLowerCase()).includes('scout hq')) {
@@ -289,7 +296,7 @@
                             }));
                         } else {
 
-                            //new mapbox GL JS  div pin 
+                            //new mapbox GL JS  div pin for scout hq
                             const el = document.createElement('div');
                             el.className = 'marker';
                             el.style.backgroundImage = `url('icons/scout-campers-factory-marker.png')`;
@@ -321,6 +328,7 @@
                         type: 'FeatureCollection',
                         features: points
                     })
+                    fitBounds("all")
                 })
 
             //addd source emty geojson 
@@ -480,14 +488,15 @@
                     if (country.code === 'all') {
                         map.setFilter('dealers', null);
                         fitBounds(country.name.toLowerCase())
-                        return;
+                    } else {
+                        map.setFilter('circle-selected', ['==', ['get', 'address'], '']);
+                        const filter = ['==', ['get', 'country'], country.name.toLowerCase().trim()];
+                        map.setFilter('dealers', filter);
+                        fitBounds(country.name.toLowerCase())
                     }
 
-                    map.setFilter('circle-selected', ['==', ['get', 'address'], '']);
-                    const filter = ['==', ['get', 'country'], country.name.toLowerCase().trim()];
-                    map.setFilter('dealers', filter);
-                    fitBounds(country.name.toLowerCase())
 
+                    console.log('country.name', country.name);
                     const newItems = mainData
                         .filter(d => {
                             if (country.name.toLowerCase() === 'all') {
@@ -531,8 +540,11 @@
         }
 
         function generateItem(pin, clickHandler, showCircle = true, itemClassName = 'item') {
+
             const { name, address, color, logoBadge } = pin;
             const phone = '434-4444-44444'
+
+            console.log('logoBadge', logoBadge);
 
             const div = document.createElement('div');
             div.className = itemClassName
